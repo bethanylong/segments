@@ -4,11 +4,34 @@ import math
 
 import svgwrite
 
+
+def distance_between_points(point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
+    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+
+def chord_length(segments, origin, radius):
+    arc = (0, degrees_per_segment(segments))
+    chord = chord_dimensions(arc, origin, radius)
+    return distance_between_points(*chord)
+
+
 def degree_sin(degrees):
     return math.sin(math.radians(degrees))
 
+
 def degree_cos(degrees):
     return math.cos(math.radians(degrees))
+
+
+def degree_tan(degrees):
+    return math.tan(math.radians(degrees))
+
+
+def degrees_per_segment(segments):
+    return 360.0 / segments
+
 
 def chord_dimensions(arc_span, origin, radius):
     """Find the endpoints of a chord spanning the given degree tuple in
@@ -25,54 +48,123 @@ def chord_dimensions(arc_span, origin, radius):
 
     return ((begin_x, begin_y), (end_x, end_y))
 
-d = svgwrite.Drawing(filename='test.svg', size=('500px', '500px'))
 
-origin = (250, 250)
-ring_radius = 200
-ring_thickness = 50
-inner_ring_radius = ring_radius - ring_thickness
+def circumscribed_radius(ring_radius, segments):
+    """If an isosceles triangle with a corner at the origin and the other
+    corners incorporating the segment looks like this:
+     .  <- origin
+    /_\ <- segment
 
-c_outer = d.circle(center=origin, r=ring_radius, fill='none', stroke='black')
-d.add(c_outer)
-c_inner = d.circle(center=origin, r=inner_ring_radius, fill='none', stroke='black')
-d.add(c_inner)
-vertical_bar = d.line(start=(250, 0), end=(250, 500), stroke='black')
-d.add(vertical_bar)
-horizontal_bar = d.line(start=(0, 250), end=(500, 250), stroke='black')
-d.add(horizontal_bar)
+    We need to make it into two right triangles that look like this so we can do
+    trigonometry on it:
+      , .
+    /_| |_\
 
-step = 30
+    This means we have to divide the angle the segment occupies by 2 since we
+    split our isosceles triangle in half.
 
-# We need to calculate a bigger radius to draw chords on, since we want to
-# circumscribe a polygon on the outer circle, not inscribe.
-theta = step / 2
-big_radius = ring_radius / degree_cos(theta)
+    The purpose of this is that our ring normally lies *within* the segments,
+    since we remove material from the segments on a lathe to make the ring. This
+    means the ring we make is inscribed in the segments. But we also want to
+    imagine a circumscribed circle lying *outside* the segments, which will help
+    us draw the segments because the outer border will be chords on the
+    circumscribed circle.
 
-outer_segment_length = 2 * ring_radius * math.tan(math.radians(theta))
-print(f'outer_segment_length: {outer_segment_length}')
-segments = 360 / step
-print(f'segments: {segments}')
+    Once we have our right triangle whose angle-by-the-origin we know, the
+    (adjacent) long leg of the triangle is the radius of the inscribed ring and
+    the hypotenuse is the radius of the circumscribed ring. (We don't care about
+    the short leg.)
 
-inner_segment_length = (inner_ring_radius * math.sin(math.radians(step))) / math.sin(math.radians((180 - step) / 2))
-print(f'inner_segment_length: {inner_segment_length}')
+    From the definition of cosine:
+    cos(theta) = adjacent / hypotenuse
 
-all_segments_length = (outer_segment_length + inner_segment_length) / 2 * segments
-print(f'all_segments_length: {all_segments_length}')
+    We know angle theta and the adjacent side, and want to find the hypotenuse.
+    So:
 
-ring_circumference = 2 * math.pi * ring_radius
-print(f'ring_circumference: {ring_circumference}')
+    hypotenuse * cos(theta) = adjacent
+    hypotenuse = adjacent / cos(theta)
 
-for begin_arc in range(0, 360, step):
-    end_arc = begin_arc + step
+    In our terminology:
 
-    # Segment boundaries for a line segment on the inside of the ring
-    inner_begin_coords, inner_end_coords = chord_dimensions((begin_arc, end_arc), origin, inner_ring_radius)
+    circumscribed_radius = inscribed_radius / cos(segment_degrees / 2) 
+    """
+    degrees_per_segment = 360.0 / segments
+    degrees_per_right_triangle = degrees_per_segment / 2
+    circumscribed_radius = ring_radius / degree_cos(degrees_per_right_triangle)
+    return circumscribed_radius
 
-    # Segment boundaries for a line segment on the outside of the ring
-    outer_begin_coords, outer_end_coords = chord_dimensions((begin_arc, end_arc), origin, big_radius)
 
-    points = [inner_begin_coords, outer_begin_coords, outer_end_coords, inner_end_coords]
-    polygon = d.polygon(points=points, fill='none', stroke='blue')
-    d.add(polygon)
+def set_up_drawing(filename='test.svg'):
+    d = svgwrite.Drawing(filename=filename, size=('500px', '500px'))
 
-d.save()
+    # Sketching out a Cartesian plane like this: +
+    vertical_bar = d.line(start=(250, 0), end=(250, 500), stroke='black')
+    d.add(vertical_bar)
+    horizontal_bar = d.line(start=(0, 250), end=(500, 250), stroke='black')
+    d.add(horizontal_bar)
+
+    return d
+
+
+def draw_ring(drawing, origin, radius, thickness):
+    """Draw two concentric circles on the given drawing, illustrating the
+    circular ring with the given radius and thickness.
+    """
+    inner_radius = radius - thickness
+    outer_circle = drawing.circle(center=origin, r=radius, fill='none', stroke='black')
+    drawing.add(outer_circle)
+    inner_circle = drawing.circle(center=origin, r=inner_radius, fill='none', stroke='black')
+    drawing.add(inner_circle)
+
+
+def draw_trapezoid(drawing, corner_coords):
+    assert len(corner_coords) == 4
+    trapezoid = drawing.polygon(points=corner_coords, fill='none', stroke='blue')
+    drawing.add(trapezoid)
+
+
+def draw_segment(drawing, arc, origin, radius, thickness, segments):
+    assert len(arc) == 2
+    inner_ring_radius = radius - thickness
+    big_radius = circumscribed_radius(radius, segments)
+    # Arranging the four corners of the trapezoid in the order in which we'll
+    # "connect the dots". The inner and outer side of the segment are chords on
+    # the inner ring circle (inner_ring_radius) and the circumscribed circle
+    # (big_radius), respectively.
+    coords = chord_dimensions(arc, origin, inner_ring_radius) \
+            + tuple(reversed(chord_dimensions(arc, origin, big_radius)))
+    draw_trapezoid(drawing, coords)
+
+
+if __name__ == '__main__':
+    d = set_up_drawing()
+
+    origin = (250, 250)
+    ring_radius = 200
+    ring_thickness = 50
+    inner_ring_radius = ring_radius - ring_thickness
+
+    draw_ring(d, origin, radius=ring_radius, thickness=ring_thickness)
+
+    segments = 12
+    step = int(degrees_per_segment(segments))
+    print(f'segments: {segments}')
+
+    outer_segment_length = chord_length(segments, origin, circumscribed_radius(ring_radius, segments))
+    print(f'outer_segment_length: {outer_segment_length}')
+
+    inner_segment_length = chord_length(segments, origin, inner_ring_radius)
+    print(f'inner_segment_length: {inner_segment_length}')
+
+    all_segments_length = (outer_segment_length + inner_segment_length) / 2 * segments
+    print(f'all_segments_length: {all_segments_length}')
+
+
+    # XXX this breaks on non-integer degree steps
+    for begin_arc in range(0, 360, step):
+        end_arc = begin_arc + step
+        arc = (begin_arc, end_arc)
+        draw_segment(d, arc, origin, ring_radius, ring_thickness, segments)
+
+    # Write the SVG
+    d.save()

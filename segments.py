@@ -152,7 +152,7 @@ if __name__ == '__main__':
 
     draw_ring(d, origin, radius=ring_radius, thickness=ring_thickness)
 
-    segments = 12
+    segments = 16
     print(f'segments: {segments}')
 
     outer_segment_length = chord_length(segments, origin, circumscribed_radius(ring_radius, segments))
@@ -164,13 +164,13 @@ if __name__ == '__main__':
     all_segments_length = (outer_segment_length + inner_segment_length) / 2 * segments
     print(f'all_segments_length: {all_segments_length}')
 
-
-    # XXX this breaks on non-integer degree steps
-    step = int(degrees_per_segment(segments))
-    for begin_arc in range(0, 360, step):
-        end_arc = begin_arc + step
-        arc = (begin_arc, end_arc)
+    arc_start = 0
+    arc_end = degrees_per_segment(segments)
+    while arc_start < 360:
+        arc = (arc_start, arc_end)
         draw_segment(d, arc, origin, ring_radius, ring_thickness, segments)
+        arc_start = arc_end
+        arc_end = arc_end + degrees_per_segment(segments)
 
     # Write the SVG
     d.save()

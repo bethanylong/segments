@@ -94,13 +94,15 @@ def circumscribed_radius(ring_radius, segments):
     return circumscribed_radius
 
 
-def set_up_drawing(filename='test.svg'):
-    d = svgwrite.Drawing(filename=filename, size=('500px', '500px'))
+def set_up_drawing(size, filename):
+    size_str = f'{size}px'
+    d = svgwrite.Drawing(filename=filename, size=(size_str, size_str))
 
     # Sketching out a Cartesian plane like this: +
-    vertical_bar = d.line(start=(250, 0), end=(250, 500), stroke='black')
+    half = size / 2
+    vertical_bar = d.line(start=(half, 0), end=(half, size), stroke='black')
     d.add(vertical_bar)
-    horizontal_bar = d.line(start=(0, 250), end=(500, 250), stroke='black')
+    horizontal_bar = d.line(start=(0, half), end=(size, half), stroke='black')
     d.add(horizontal_bar)
 
     return d
@@ -137,17 +139,20 @@ def draw_segment(drawing, arc, origin, radius, thickness, segments):
 
 
 if __name__ == '__main__':
-    d = set_up_drawing()
+    size = 500
+    half = size / 2
+    filename = 'test.svg'
+    d = set_up_drawing(size, filename)
 
-    origin = (250, 250)
-    ring_radius = 200
+    origin = (half, half)
+    arbitrary_margin = 50
+    ring_radius = half - arbitrary_margin
     ring_thickness = 50
     inner_ring_radius = ring_radius - ring_thickness
 
     draw_ring(d, origin, radius=ring_radius, thickness=ring_thickness)
 
     segments = 12
-    step = int(degrees_per_segment(segments))
     print(f'segments: {segments}')
 
     outer_segment_length = chord_length(segments, origin, circumscribed_radius(ring_radius, segments))
@@ -161,6 +166,7 @@ if __name__ == '__main__':
 
 
     # XXX this breaks on non-integer degree steps
+    step = int(degrees_per_segment(segments))
     for begin_arc in range(0, 360, step):
         end_arc = begin_arc + step
         arc = (begin_arc, end_arc)

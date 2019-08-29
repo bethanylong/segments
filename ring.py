@@ -4,6 +4,8 @@ import math
 
 import svgwrite
 
+import sketch
+
 
 def distance_between_points(point1, point2):
     x1, y1 = point1
@@ -94,20 +96,6 @@ def circumscribed_radius(ring_radius, segments):
     return circumscribed_radius
 
 
-def set_up_drawing(size, filename):
-    size_str = f'{size}px'
-    d = svgwrite.Drawing(filename=filename, size=(size_str, size_str))
-
-    # Sketching out a Cartesian plane like this: +
-    half = size / 2
-    vertical_bar = d.line(start=(half, 0), end=(half, size), stroke='black')
-    d.add(vertical_bar)
-    horizontal_bar = d.line(start=(0, half), end=(size, half), stroke='black')
-    d.add(horizontal_bar)
-
-    return d
-
-
 def draw_ring(drawing, origin, radius, thickness):
     """Draw two concentric circles on the given drawing, illustrating the
     circular ring with the given radius and thickness.
@@ -139,30 +127,38 @@ def draw_segment(drawing, arc, origin, radius, thickness, segments):
 
 
 if __name__ == '__main__':
+    def mm(inches, mm_per_inch=50):
+        return inches * mm_per_inch
+
+    def inch(mm, mm_per_inch=50):
+        return mm / mm_per_inch
+
     size = 500
     half = size / 2
     filename = 'test.svg'
-    d = set_up_drawing(size, filename)
+    d = sketch.set_up_drawing(size, filename)
 
     origin = (half, half)
-    arbitrary_margin = 50
-    ring_radius = half - arbitrary_margin
-    ring_thickness = 50
+    #arbitrary_margin = 50
+    #ring_radius = half - arbitrary_margin
+    ring_radius =  mm((6 + 5/8) / 2)
+    #ring_thickness = 50
+    ring_thickness = mm(3 / 4)
     inner_ring_radius = ring_radius - ring_thickness
 
     draw_ring(d, origin, radius=ring_radius, thickness=ring_thickness)
 
-    segments = 16
+    segments = 12
     print(f'segments: {segments}')
 
     outer_segment_length = chord_length(segments, origin, circumscribed_radius(ring_radius, segments))
-    print(f'outer_segment_length: {outer_segment_length}')
+    print(f'outer_segment_length: {inch(outer_segment_length)} in')
 
     inner_segment_length = chord_length(segments, origin, inner_ring_radius)
-    print(f'inner_segment_length: {inner_segment_length}')
+    print(f'inner_segment_length: {inch(inner_segment_length)} in')
 
     all_segments_length = (outer_segment_length + inner_segment_length) / 2 * segments
-    print(f'all_segments_length: {all_segments_length}')
+    print(f'all_segments_length: {inch(all_segments_length)} in')
 
     arc_start = 0
     arc_end = degrees_per_segment(segments)
